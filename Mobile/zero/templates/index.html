@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Raspberry Pi NFC Scanner</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            background-color: #f8f9fa;
+        }
+        .container {
+            width: 75%;
+            margin: auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .highlight {
+            padding: 5px 10px;
+            font-weight: bold;
+            border-radius: 5px;
+        }
+        .highlight.active {
+            background-color: #28a745;
+            color: white;
+        }
+        input, button {
+            margin: 5px;
+            padding: 10px;
+            width: 80%;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        th, td {
+            padding: 10px;
+            border: 1px solid #ddd;
+        }
+        th {
+            background-color: #407df7;
+            color: white;
+        }
+        .delete-icon {
+            cursor: pointer;
+            color: red;
+            font-size: 18px;
+            padding: 5px;
+        }
+        .delete-icon:hover {
+            color: darkred;
+        }
+    </style>
+    <script>
+        function fetchLatestUID() {
+            fetch('/api/new_UID')
+                .then(response => response.json())
+                .then(data => {
+                    let latestUIDElement = document.getElementById("latest_uid");
+                    let activeSampleElement = document.getElementById("active_sample");
+                    let hiddenUIDInput = document.getElementById("hidden_uid");
+
+                    if (data.new_UID) {
+                        latestUIDElement.textContent = data.new_UID;
+                        latestUIDElement.classList.add("active");
+                        hiddenUIDInput.value = data.new_UID;  // 💥 Set UID in hidden field
+                    } else {
+                        latestUIDElement.textContent = "Waiting...";
+                        latestUIDElement.classList.remove("active");
+                        hiddenUIDInput.value = "";  // Clear UID if none
+                    }
+
+                    if (data.active_sample) {
+                        activeSampleElement.textContent = data.active_sample;
+                        activeSampleElement.classList.add("active");
+                    } else {
+                        activeSampleElement.textContent = "Waiting...";
+                        activeSampleElement.classList.remove("active");
+                    }
+                });
+        }
+        setInterval(fetchLatestUID, 1000);
+        function confirmDelete(sampleID, UID) {
+        if (confirm(`Are you sure you want to delete Sample ID "${sampleID}"?`)) {
+            fetch(`/delete/${UID}`, {
+                method: 'POST'
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert("Sample deleted.");
+                    location.reload();  // Refresh to update table
+                } else {
+                    alert("Error deleting sample.");
+                }
+            })
+            .catch(error => {
+                alert("Request failed.");
+                console.error(error);
+            });
+        }
+    }
+    </script>
+
+</head>
+<body>
+    <div class="container">
+        <h1>Mobile Tag Scanner</h1>
+        <p>Newly Detected UID: <span id="latest_uid" class="highlight">Waiting...</span></p>
+        <p>Recently Scanned ID: <span id="active_sample" class="highlight">Waiting...</span></p>
+                
+        <form method="POST">
+            <input type="text" name="ID" placeholder="Sample ID" required>
+            <input type="text" name="FID" placeholder="Field #" required>
+            <input type="text" name="PID" placeholder="Project #" required>
+            <input type="text" name="SB" placeholder="Sampled By" required>
+            <input type="text" name="TB" placeholder="Tested By" required>
+            <input type="text" name="TR" placeholder="Tests Run" required>
+            <input type="hidden" name="UID" id="hidden_uid">
+            <button type="submit">Submit</button>
+        </form>
+        
+        
+
+        <h2>Stored NFC Data</h2>
+        <table>
+            <tr>
+                <th>Sample ID</th>
+                <th>UID</th>
+                <th>Delete</th>
+            </tr>
+            {% for chip in chip_data %}
+            <tr>
+                <td>{{ chip.ID }}</td>
+                <td>{{ chip.UID }}</td>
+                <td>
+                    <span class="delete-icon" onclick="confirmDelete('{{ chip.ID }}', '{{ chip.UID }}')">X</span>
+                </td>
+            </tr>
+            {% endfor %}
+        </table>
+    </div>
+</body>
+</html>
